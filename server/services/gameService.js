@@ -1,7 +1,6 @@
 const { Mutex } = require('async-mutex');
-const mongoose = require('mongoose');
-const questionGenerator = require('./questionGenerator');
-const User = require('./models/User');
+const questionGenerator = require('../questionGenerator');
+const userService = require('./userService');
 
 const COOLDOWN_MS = 5000;
 
@@ -11,12 +10,8 @@ class GameManager {
     this.mutex = new Mutex();
     this.currentQuestion = null;
     this.isActive = false;
-    this.players = new Map(); // socketId -> { userId, username, socket }
-    this.scores = new Map(); // userId -> { userId, username, score, wins, gamesPlayed } (in-memory fallback)
-  }
-
-  get dbAvailable() {
-    return mongoose.connection.readyState === 1;
+    this.players = new Map();
+    this.scores = new Map();
   }
 
   addPlayer(socket, username, userId) {
@@ -84,53 +79,38 @@ class GameManager {
         : this.currentQuestion.difficulty === 'medium' ? 20
         : 30;
 
-      // Update in-memory scores (always available)
+      // Update in-memory scores
       const memEntry = this.scores.get(player.userId) || { userId: player.userId, username: player.username, score: 0, wins: 0, gamesPlayed: 0 };
       memEntry.score += scoreGain;
       memEntry.wins += 1;
       memEntry.gamesPlayed += 1;
       this.scores.set(player.userId, memEntry);
 
+      const otherUserIds = [];
       for (const [id, p] of this.players) {
         if (id !== socket.id) {
           const other = this.scores.get(p.userId);
           if (other) other.gamesPlayed += 1;
+          otherUserIds.push(p.userId);
         }
       }
 
-      // Persist to DB if available
-      if (this.dbAvailable) {
-        try {
-          await User.findOneAndUpdate(
-            { userId: player.userId },
-            { $inc: { score: scoreGain, wins: 1, gamesPlayed: 1 } },
-            { upsert: true, setDefaultsOnInsert: true }
-          );
-
-          const otherUserIds = [];
-          for (const [id, p] of this.players) {
-            if (id !== socket.id) otherUserIds.push(p.userId);
-          }
-          if (otherUserIds.length > 0) {
-            await User.updateMany(
-              { userId: { $in: otherUserIds } },
-              { $inc: { gamesPlayed: 1 } }
-            );
-          }
-        } catch (err) {
-          console.error('DB update failed (using in-memory scores):', err.message);
-        }
+      // Persist to DB via userService
+      try {
+        await userService.incrementWin(player.userId, scoreGain);
+        await userService.incrementGamesPlayed(otherUserIds);
+      } catch (err) {
+        console.error('DB update failed (using in-memory scores):', err.message);
       }
 
       // Build leaderboard
       let leaderboard;
-      if (this.dbAvailable) {
-        try {
-          leaderboard = await User.find().sort({ score: -1 }).limit(10).lean();
-        } catch {
-          leaderboard = this.getInMemoryLeaderboard();
-        }
-      } else {
+      try {
+        leaderboard = await userService.getLeaderboard();
+      } catch {
+        leaderboard = null;
+      }
+      if (!leaderboard) {
         leaderboard = this.getInMemoryLeaderboard();
       }
 
