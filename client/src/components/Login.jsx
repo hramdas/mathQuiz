@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { apiUrl } from '../config';
 
 export default function Login({ onLogin }) {
   const [username, setUsername] = useState('');
@@ -14,7 +15,7 @@ export default function Login({ onLogin }) {
     setError('');
 
     try {
-      const res = await fetch('/api/register', {
+      const res = await fetch(apiUrl('/api/register'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: trimmed }),

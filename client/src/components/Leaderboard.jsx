@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
+import { apiUrl } from '../config';
 
 export default function Leaderboard({ realtimeData, currentUser }) {
   const [data, setData] = useState([]);
 
   useEffect(() => {
-    fetch('/api/leaderboard')
+    fetch(apiUrl('/api/leaderboard'))
       .then((res) => res.json())
       .then(setData)
       .catch(() => {});
