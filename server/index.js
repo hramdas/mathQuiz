@@ -11,18 +11,15 @@ const GameManager = require('./gameManager');
 const app = express();
 const server = http.createServer(app);
 
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
-const allowedOrigins = CLIENT_ORIGIN.split(',').map((o) => o.trim());
-
 const corsOptions = {
-  origin: allowedOrigins,
+  origin: '*',
   methods: ['GET', 'POST'],
   credentials: true,
 };
 
 const io = new Server(server, { cors: corsOptions });
 
-app.use(cors(corsOptions));
+app.use(cors())
 app.use(express.json());
 
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/mathquiz';
