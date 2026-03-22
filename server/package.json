@@ -1,0 +1,21 @@
+{
+  "name": "math-quiz-server",
+  "version": "1.0.0",
+  "description": "Math Quiz backend server",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon index.js",
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "async-mutex": "^0.5.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.3.1",
+    "express": "^4.21.0",
+    "mongoose": "^8.8.0",
+    "socket.io": "^4.8.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
