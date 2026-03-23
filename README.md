@@ -4,24 +4,44 @@ A real-time multiplayer math quiz web app. All connected users see the same ques
 
 ## Quick Start
 
+Run the **server** and **client** in two separate terminals.
+
 ### Prerequisites
 
 - **Node.js** 18+
-- **MongoDB** running locally on port `27017` (or via Docker: `docker run -d -p 27017:27017 mongo`)
+- **MongoDB** (optional) on port `27017` — e.g. `docker run -d -p 27017:27017 mongo`. If MongoDB is not running, the app still works with in-memory scores.
 
-### Install & Run
+### 1. Environment
+
+Copy the example env files and adjust if needed:
 
 ```bash
-# Install all dependencies (root + server + client)
-npm install
-npm run install:all
+cp server/.env.example server/.env
+cp client/.env.example client/.env
+```
 
-# Start both server and client
+- **`server/.env`**: `PORT`, `MONGO_URI`, `CLIENT_ORIGIN` (your Vite URL, e.g. `http://localhost:5173`)
+- **`client/.env`**: `VITE_SERVER_URL` (API base, e.g. `http://localhost:4000`)
+
+### 2. Backend (terminal 1)
+
+```bash
+cd server
+npm install
 npm run dev
 ```
 
-- **Client**: http://localhost:5173
-- **Server**: http://localhost:4000
+Server: **http://localhost:4000** (default).
+
+### 3. Frontend (terminal 2)
+
+```bash
+cd client
+npm install
+npm run dev
+```
+
+Client: **http://localhost:5173** (default).
 
 Open multiple browser tabs to simulate multiple players.
 
@@ -61,7 +81,7 @@ Open multiple browser tabs to simulate multiple players.
 | Socket.IO       | Real-time bidirectional communication             |
 | MongoDB/Mongoose| Persistent user scores and leaderboard           |
 | async-mutex     | Mutex lock for concurrent answer processing      |
-| concurrently    | Run server + client in parallel                  |
+| dotenv          | Server environment variables                     |
 
 ## How It Works
 
@@ -69,7 +89,7 @@ Open multiple browser tabs to simulate multiple players.
 
 The core challenge is ensuring only one winner per question when many users submit answers near-simultaneously.
 
-**Solution**: The `GameManager` uses an `async-mutex` lock around the answer-processing logic:
+**Solution**: The game service (`services/gameService.js`) uses an `async-mutex` lock around the answer-processing logic:
 
 1. Answer arrives via Socket.IO
 2. Server acquires the mutex lock
@@ -111,7 +131,7 @@ These decisions were made to keep the project within the 2-3 hour scope:
 | Area              | What was done                       | Production alternative                                          |
 | ----------------- | ----------------------------------- | --------------------------------------------------------------- |
 | Authentication    | Simple username (no password)       | JWT + OAuth (Google/GitHub), session management                  |
-| Database config   | Hardcoded local MongoDB URI         | Environment variables, connection pooling, replica sets          |
+| Database config   | `.env` on server (`MONGO_URI`)      | Secrets manager, connection pooling, replica sets                |
 | Rate limiting     | None                                | Per-user rate limiting on answer submissions (e.g., 5/sec)       |
 | Testing           | Manual testing only                 | Unit tests (Jest), integration tests, E2E (Playwright)           |
 | Deployment        | Local development only              | Docker, CI/CD pipeline, nginx reverse proxy                      |
@@ -124,23 +144,23 @@ These decisions were made to keep the project within the 2-3 hour scope:
 ```
 mathQuiz/
 ├── server/
-│   ├── index.js               # Express + Socket.IO entry point
-│   ├── gameManager.js          # Mutex-locked game logic
-│   ├── questionGenerator.js    # Random math problem factory
-│   └── models/User.js          # Mongoose schema
+│   ├── index.js                 # App entry: Express, Socket.IO, DB connect
+│   ├── routes/api.js            # REST routes
+│   ├── controllers/userController.js
+│   ├── services/
+│   │   ├── gameService.js       # Game rounds, mutex, Socket.IO broadcasts
+│   │   └── userService.js       # User / leaderboard persistence
+│   ├── questionGenerator.js
+│   └── models/User.js
 ├── client/
 │   ├── src/
-│   │   ├── App.jsx             # Root component
-│   │   ├── App.css             # Global styles (dark theme)
+│   │   ├── config.js           # VITE_SERVER_URL helper
+│   │   ├── App.jsx
+│   │   ├── App.css
 │   │   ├── components/
-│   │   │   ├── Login.jsx       # Username entry
-│   │   │   ├── Quiz.jsx        # Question display + answer input
-│   │   │   ├── Leaderboard.jsx # Live top-10 scores
-│   │   │   └── WinnerBanner.jsx# Animated winner overlay
-│   │   └── hooks/useSocket.js  # Socket.IO client hook
+│   │   └── hooks/useSocket.js
 │   ├── vite.config.js
 │   └── index.html
-├── package.json                # Root orchestrator
 └── README.md
 ```
 
@@ -148,6 +168,6 @@ mathQuiz/
 
 ~2.5 hours total:
 - Architecture & planning: ~20 min
-- Server (Express, Socket.IO, GameManager, Question Generator): ~50 min
+- Server (Express, Socket.IO, services/controllers, question generator): ~50 min
 - Client (React components, Socket hook, styling): ~70 min
 - Integration, testing, polish: ~30 min
